@@ -1,0 +1,140 @@
+﻿name: Build TTS Executables and Push to S3
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  build-and-upload:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            os_name: linux
+            executable_name: tts
+          - os: windows-latest
+            os_name: windows
+            executable_name: tts.exe
+          - os: macos-latest
+            os_name: macos
+            executable_name: tts
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --name tts --add-data "models;models" main.py
+
+      - name: Create directory structure for S3
+        shell: bash
+        run: |
+          mkdir -p build_output/tts/${{ matrix.os_name }}
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/tts.exe build_output/tts/${{ matrix.os_name }}/
+          else
+            cp dist/tts build_output/tts/${{ matrix.os_name }}/
+          fi
+
+      # Install AWS CLI
+      - name: Install AWS CLI
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            echo "Installing AWS CLI on Linux..."
+            sudo apt update
+            sudo apt install -y unzip curl
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.15.30.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+            AWS_CLI_PATH="/usr/local/bin/aws"
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            echo "Installing AWS CLI on Windows..."
+            curl "https://awscli.amazonaws.com/AWSCLIV2.msi" -o "AWSCLIV2.msi"
+            msiexec /i AWSCLIV2.msi /quiet
+            AWS_CLI_PATH="aws"
+          else
+            echo "Installing AWS CLI on macOS..."
+            curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+            sudo installer -pkg AWSCLIV2.pkg -target /
+            AWS_CLI_PATH="/usr/local/bin/aws"
+          fi
+          
+          echo "AWS_CLI_PATH=$AWS_CLI_PATH" >> $GITHUB_ENV
+          echo "Installed AWS CLI version:"
+          $AWS_CLI_PATH --version
+
+      # Configure AWS CLI
+      - name: Configure AWS CLI for Timeweb S3
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: |
+          # Create .aws directory
+          mkdir -p ~/.aws
+          
+          # Create credentials file
+          cat > ~/.aws/credentials << EOF
+          [default]
+          aws_access_key_id = $AWS_ACCESS_KEY_ID
+          aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
+          EOF
+          
+          # Create config file with multipart disabled
+          cat > ~/.aws/config << EOF
+          [default]
+          region = ru-1
+          output = json
+          s3 =
+              multipart_threshold = 100MB
+              multipart_chunksize = 16MB
+              max_concurrent_requests = 1
+              max_bandwidth = 100MB/s
+          EOF
+          
+          echo "AWS CLI configured for Timeweb S3"
+
+      # Test S3 connection
+      - name: Test S3 connection
+        shell: bash
+        run: |
+          echo "Testing connection to Timeweb S3..."
+          ${{ env.AWS_CLI_PATH }} s3 ls s3://${{ secrets.S3_BUCKET_NAME }} --endpoint-url ${{ secrets.S3_ENDPOINT_URL }} || echo "Connection test failed, but continuing..."
+
+      # Upload to S3 directly
+      - name: Upload to S3
+        shell: bash
+        run: |
+          echo "Files to upload:"
+          find build_output -type f
+          
+          # Upload to S3
+          ${{ env.AWS_CLI_PATH }} s3 sync build_output \
+            s3://${{ secrets.S3_BUCKET_NAME }}/ \
+            --endpoint-url ${{ secrets.S3_ENDPOINT_URL }}
+          
+          echo "S3 upload completed successfully for ${{ matrix.os_name }}"
+
+      - name: Clean up
+        if: always()
+        shell: bash
+        run: |
+          # Clean up credentials for security
+          rm -rf ~/.aws || true

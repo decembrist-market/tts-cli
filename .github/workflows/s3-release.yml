@@ -39,6 +39,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build executable with PyInstaller
+        shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             pyinstaller --onefile --name tts --add-data "models;models" main.py

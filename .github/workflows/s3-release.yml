@@ -40,7 +40,11 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile --name tts --add-data "models;models" main.py
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pyinstaller --onefile --name tts --add-data "models;models" main.py
+          else
+            pyinstaller --onefile --name tts --add-data "models:models" main.py
+          fi
 
       - name: Create directory structure for S3
         shell: bash

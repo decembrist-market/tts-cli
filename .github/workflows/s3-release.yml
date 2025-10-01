@@ -52,7 +52,7 @@ jobs:
             python -m pip install --upgrade pip && \
             pip install pyinstaller && \
             pip install -r requirements.txt && \
-            pyinstaller --onefile --strip --name tts --add-data 'models:models' --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime --noupx main.py
+            pyinstaller tts.spec
           "
 
       # Install system dependencies for better compatibility (non-Docker)
@@ -73,12 +73,7 @@ jobs:
         if: matrix.use_docker == false
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            pyinstaller --onefile --name tts --add-data "models;models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime main.py
-          else
-            # For macOS, add compatibility options
-            pyinstaller --onefile --strip --name tts --add-data "models:models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime --noupx main.py
-          fi
+          pyinstaller tts.spec
 
       - name: Create directory structure for S3
         shell: bash

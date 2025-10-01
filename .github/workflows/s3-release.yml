@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             os_name: linux
             executable_name: tts
             arch: x86_64
@@ -50,7 +50,8 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             pyinstaller --onefile --name tts --add-data "models;models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime main.py
           else
-            pyinstaller --onefile --name tts --add-data "models:models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime main.py
+            # For Linux, add --strip option to reduce size and improve compatibility
+            pyinstaller --onefile --strip --name tts --add-data "models:models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime main.py
           fi
 
       - name: Create directory structure for S3
@@ -67,7 +68,7 @@ jobs:
       - name: Install AWS CLI
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
             echo "Checking for existing AWS CLI on Linux..."
             if command -v aws &> /dev/null; then
               echo "AWS CLI already installed, using existing installation"

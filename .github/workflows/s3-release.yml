@@ -10,7 +10,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          # NOTE: Linux runner pinned to ubuntu-22.04 to keep glibc <= 2.36 for wider
+          # compatibility (user target Debian 12 has glibc 2.36). Using ubuntu-latest (24.04)
+          # resulted in binaries requiring GLIBC_2.38+.
+          - os: ubuntu-22.04
             os_name: linux
             executable_name: tts
             arch: x86_64
@@ -53,6 +56,17 @@ jobs:
             pyinstaller --onefile --name tts --add-data "models:models" --hidden-import=piper --hidden-import=onnxruntime --hidden-import=numpy --collect-all piper --collect-all onnxruntime main.py
           fi
 
+      - name: Inspect Linux binary glibc requirements
+        if: matrix.os_name == 'linux'
+        shell: bash
+        run: |
+          echo 'ldd --version:'
+            ldd --version || true
+          echo 'Shared library dependencies:'
+          ldd dist/tts || true
+          echo 'Referenced GLIBC symbols:'
+          strings dist/tts | grep -E 'GLIBC_[0-9]+' | sort -u
+
       - name: Create directory structure for S3
         shell: bash
         run: |
@@ -67,7 +81,7 @@ jobs:
       - name: Install AWS CLI
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
             echo "Checking for existing AWS CLI on Linux..."
             if command -v aws &> /dev/null; then
               echo "AWS CLI already installed, using existing installation"

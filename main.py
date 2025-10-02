@@ -3,6 +3,7 @@ import argparse
 import sys
 import wave
 import os
+import base64
 from pathlib import Path
 
 try:
@@ -128,12 +129,27 @@ class TTSProcessor:
         return models
 
 
+def decode_base64_text(base64_text):
+    """Декодирует текст из base64 формата"""
+    try:
+        # Удаляем возможные пробелы и переносы строк
+        cleaned_base64 = base64_text.replace(' ', '').replace('\n', '').replace('\r', '')
+        # Декодируем из base64
+        decoded_bytes = base64.b64decode(cleaned_base64)
+        # Преобразуем в строку с UTF-8 кодировкой
+        decoded_text = decoded_bytes.decode('utf-8')
+        return decoded_text
+    except Exception as e:
+        raise ValueError(f"Ошибка декодирования base64: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="TTS с использованием Piper")
     parser.add_argument("text", nargs="?", help="Текст для синтеза речи")
     parser.add_argument("-l", "--language", default="ru", help="Язык модели (по умолчанию: ru)")
     parser.add_argument("-o", "--output", help="Имя выходного WAV файла")
     parser.add_argument("--list-models", action="store_true", help="Показать доступные модели")
+    parser.add_argument("--base64", action="store_true", help="Входной текст закодирован в base64")
 
     args = parser.parse_args()
 
@@ -149,12 +165,24 @@ def main():
     if not args.text:
         print("Ошибка: Не указан текст для синтеза")
         print("Использование: python main.py 'Текст для синтеза' -l ru")
+        print("Использование с base64: python main.py 'base64_строка' --base64 -l ru")
         print("Для просмотра доступных моделей: python main.py --list-models")
         return
 
     try:
+        # Обрабатываем входной текст
+        if args.base64:
+            try:
+                text_to_synthesize = decode_base64_text(args.text)
+                print(f"Декодированный текст: '{text_to_synthesize}'")
+            except ValueError as e:
+                print(f"Ошибка: {e}")
+                return
+        else:
+            text_to_synthesize = args.text
+
         # Выполняем синтез речи
-        output_file = tts.text_to_speech(args.text, args.language, args.output)
+        output_file = tts.text_to_speech(text_to_synthesize, args.language, args.output)
         print(f"\nГотово! Аудио файл: {output_file}")
 
     except FileNotFoundError as e:

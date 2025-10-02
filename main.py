@@ -6,10 +6,23 @@ import os
 import base64
 from pathlib import Path
 
+def safe_print(*args, **kwargs):
+    """Безопасный print для subprocess в Windows"""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        # Если не получается вывести с русскими символами, выводим без них
+        try:
+            message = ' '.join(str(arg) for arg in args)
+            safe_message = message.encode('ascii', 'replace').decode('ascii')
+            print(safe_message, **kwargs)
+        except:
+            pass  # В крайнем случае просто пропускаем вывод
+
 try:
     from piper import PiperVoice
 except ImportError:
-    print("Ошибка: Не установлен piper-tts. Установите зависимости: pip install -r requirements.txt")
+    safe_print("Error: piper-tts not installed. Install dependencies: pip install -r requirements.txt")
     sys.exit(1)
 
 
@@ -41,10 +54,10 @@ class TTSProcessor:
         if not config_path.exists():
             raise FileNotFoundError(f"Конфигурация {config_path} не найдена")
 
-        print(f"Загружаю модель для языка: {language}")
+        safe_print(f"Загружаю модель для языка: {language}")
         self.voice = PiperVoice.load(str(model_path), str(config_path))
         self.current_language = language
-        print(f"Модель {language} успешно загружена")
+        safe_print(f"Модель {language} успешно загружена")
 
     def text_to_speech(self, text, language, output_filename=None):
         """Преобразует текст в речь и сохраняет в WAV файл"""
@@ -58,9 +71,9 @@ class TTSProcessor:
 
         output_path = Path(output_filename)
 
-        print(f"Синтезирую речь: '{text}'")
-        print(f"Язык: {language}")
-        print(f"Выходной файл: {output_path}")
+        safe_print(f"Синтезирую речь: '{text}'")
+        safe_print(f"Язык: {language}")
+        safe_print(f"Выходной файл: {output_path}")
 
         # Синтезируем речь используя правильный API
         audio_data = bytes()
@@ -75,7 +88,7 @@ class TTSProcessor:
             wav_file.setframerate(self.voice.config.sample_rate)
             wav_file.writeframes(audio_data)
 
-        print(f"Аудио сохранено в: {output_path.absolute()}")
+        safe_print(f"Аудио сохранено в: {output_path.absolute()}")
         return output_path
 
     def write_wav_file(self, file_handle, audio_data, sample_rate):
@@ -119,12 +132,12 @@ class TTSProcessor:
                 models.append(file.stem)
 
         if models:
-            print("Доступные языки:")
+            safe_print("Доступные языки:")
             for model in sorted(models):
-                print(f"  - {model}")
+                safe_print(f"  - {model}")
         else:
-            print("Модели не найдены в папке models/")
-            print("Поместите файлы *.onnx и *.onnx.json в папку models/")
+            safe_print("Модели не найдены в папке models/")
+            safe_print("Поместите файлы *.onnx и *.onnx.json в папку models/")
 
         return models
 
@@ -163,10 +176,10 @@ def main():
 
     # Проверяем, что передан текст
     if not args.text:
-        print("Ошибка: Не указан текст для синтеза")
-        print("Использование: python main.py 'Текст для синтеза' -l ru")
-        print("Использование с base64: python main.py 'base64_строка' --base64 -l ru")
-        print("Для просмотра доступных моделей: python main.py --list-models")
+        safe_print("Ошибка: Не указан текст для синтеза")
+        safe_print("Использование: python main.py 'Текст для синтеза' -l ru")
+        safe_print("Использование с base64: python main.py 'base64_строка' --base64 -l ru")
+        safe_print("Для просмотра доступных моделей: python main.py --list-models")
         return
 
     try:
@@ -174,26 +187,26 @@ def main():
         if args.base64:
             try:
                 text_to_synthesize = decode_base64_text(args.text)
-                print(f"Декодированный текст: '{text_to_synthesize}'")
+                safe_print(f"Декодированный текст: '{text_to_synthesize}'")
             except ValueError as e:
-                print(f"Ошибка: {e}")
+                safe_print(f"Ошибка: {e}")
                 return
         else:
             text_to_synthesize = args.text
 
         # Выполняем синтез речи
         output_file = tts.text_to_speech(text_to_synthesize, args.language, args.output)
-        print(f"\nГотово! Аудио файл: {output_file}")
+        safe_print(f"\nГотово! Аудио файл: {output_file}")
 
     except FileNotFoundError as e:
-        print(f"Ошибка: {e}")
-        print(f"\nУбедитесь, что в папке models/ есть файлы:")
-        print(f"  - {args.language}.onnx")
-        print(f"  - {args.language}.onnx.json")
-        print("\nДля просмотра доступных моделей: python main.py --list-models")
+        safe_print(f"Ошибка: {e}")
+        safe_print(f"\nУбедитесь, что в папке models/ есть файлы:")
+        safe_print(f"  - {args.language}.onnx")
+        safe_print(f"  - {args.language}.onnx.json")
+        safe_print("\nДля просмотра доступных моделей: python main.py --list-models")
 
     except Exception as e:
-        print(f"Ошибка при синтезе речи: {e}")
+        safe_print(f"Ошибка при синтезе речи: {e}")
 
 
 if __name__ == '__main__':

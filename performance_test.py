@@ -4,10 +4,13 @@ import base64
 import time
 import os
 
+# Получаем директорию проекта (где находится этот скрипт)
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 print("=" * 70)
 print("=== PERFORMANCE TEST: TTS Stream Mode ===")
 print("=" * 70)
-print()
+print(f"Project directory: {PROJECT_DIR}\n")
 
 # Запускаем процесс
 start_init = time.time()
@@ -18,7 +21,8 @@ process = subprocess.Popen(
     stderr=subprocess.PIPE,
     text=True,
     encoding='utf-8',
-    bufsize=1
+    bufsize=1,
+    cwd=PROJECT_DIR  # Запускаем в директории проекта
 )
 
 print("Starting TTS process in stream mode...")
@@ -38,7 +42,7 @@ test_cases = [
         "Производительность является ключевым параметром для практического применения технологии. "
         "Мы тестируем скорость обработки текста различной длины и сложности. "
         "Результаты помогут оптимизировать систему для работы на устройствах с ограниченными ресурсами.",
-        "D:/projects/python/tts/perf_test1.wav"
+        os.path.join(PROJECT_DIR, "perf_test1.wav")
     ),
     (
         "Второй тестовый фрагмент содержит еще более длинный текст для проверки скорости обработки больших объемов данных. "
@@ -51,7 +55,7 @@ test_cases = [
         "Каждая из этих метрик дает важную информацию о поведении системы в различных сценариях использования. "
         "Особое внимание уделяется стабильности работы при длительной непрерывной работе и обработке множества запросов подряд. "
         "Результаты тестирования помогут определить оптимальные параметры конфигурации для различных типов устройств.",
-        "test_subfolder/perf_test2.wav"
+        os.path.join(PROJECT_DIR, "test_subfolder", "perf_test2.wav")
     ),
     (
         "Третий тест проверяет возможность сохранения файлов в произвольных директориях на различных дисках системы. "
@@ -65,7 +69,7 @@ test_cases = [
         "временных директориях системы и пользовательских папках с различными правами доступа. "
         "Каждый сценарий имеет свои особенности и может влиять на итоговую производительность приложения. "
         "Результаты помогут выработать рекомендации по оптимальной организации хранения сгенерированных аудио файлов.",
-        "C:/temp/tts_test/perf_test3.wav"
+        os.path.join(PROJECT_DIR, "temp_test", "perf_test3.wav")
     ),
     (
         "Четвертый тестовый случай использует автоматическую генерацию имени файла с уникальной временной меткой. "
@@ -199,9 +203,9 @@ try:
     print("=" * 70)
 
     check_paths = [
-        "D:/projects/python/tts/perf_test1.wav",
-        "D:/projects/python/tts/test_subfolder/perf_test2.wav",
-        "C:/temp/tts_test/perf_test3.wav",
+        os.path.join(PROJECT_DIR, "perf_test1.wav"),
+        os.path.join(PROJECT_DIR, "test_subfolder", "perf_test2.wav"),
+        os.path.join(PROJECT_DIR, "temp_test", "perf_test3.wav"),
     ]
 
     total_size = 0
@@ -297,4 +301,3 @@ except Exception as e:
 print("\n" + "=" * 70)
 print("=== TEST COMPLETED ===")
 print("=" * 70)
-

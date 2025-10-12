@@ -144,12 +144,12 @@ class TTSProcessor:
 
         return models
 
-    def stream_mode(self, default_language="ru", default_output_dir=None):
+    def stream_mode(self, default_language="ru"):
         """Потоковый режим: читает команды из stdin и обрабатывает их"""
         safe_print("=== TTS Потоковый режим запущен ===")
         safe_print(f"Язык: {default_language}")
-        safe_print("Формат команды: base64_текст|путь_к_файлу")
-        safe_print("Или просто: base64_текст (файл будет создан автоматически)")
+        safe_print("Формат команды: base64_текст|полный_путь_к_файлу")
+        safe_print("Или просто: base64_текст (файл будет создан в текущей директории)")
         safe_print("Для завершения введите: exit")
         safe_print("Ожидаю команды...\n")
         sys.stdout.flush()
@@ -170,9 +170,10 @@ class TTSProcessor:
                     # Декодируем base64
                     text = decode_base64_text(base64_text)
 
-                    # Используем default_output_dir если указан
-                    if default_output_dir:
-                        output_path = os.path.join(default_output_dir, os.path.basename(output_path))
+                    # Создаем директорию если её нет
+                    output_dir = os.path.dirname(output_path)
+                    if output_dir and not os.path.exists(output_dir):
+                        os.makedirs(output_dir, exist_ok=True)
 
                     # Генерируем речь с языком из аргументов запуска
                     result = self.text_to_speech(text, default_language, output_path)
@@ -211,12 +212,12 @@ class TTSProcessor:
                 if len(parts) == 1:
                     # Только base64 текст, генерируем имя автоматически
                     base64_text = parts[0]
-                    # Генерируем уникальное имя файла
+                    # Генерируем уникальное имя файла в текущей директории
                     import time
                     timestamp = int(time.time() * 1000)
                     output_path = f"output_{timestamp}.wav"
                 elif len(parts) == 2:
-                    # base64 текст и путь к файлу
+                    # base64 текст и путь к файлу (может быть полным путем)
                     base64_text, output_path = parts
                 else:
                     safe_print(f"ERROR:Неверный формат команды. Ожидается: base64_текст|путь или base64_текст")
@@ -277,8 +278,7 @@ def main():
     # Потоковый режим
     if args.stream:
         tts.stream_mode(
-            default_language=args.language,
-            default_output_dir=args.output
+            default_language=args.language
         )
         return
 

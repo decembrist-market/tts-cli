@@ -1,231 +1,237 @@
-﻿# TTS с Piper
+﻿# TTS with Piper
 
-Программа для преобразования текста в речь с использованием Piper TTS.
+Text-to-speech program using Piper TTS.
 
-## Возможности
+## Features
 
-- 🎯 Синтез речи на разных языках (русский, английский и др.)
-- 🚀 **Потоковый режим** — обработка множества задач без перезапуска процесса
-- 🔐 Поддержка **base64** кодирования текста
-- 📝 Чтение текста из аргументов командной строки или stdin
-- 🔄 Автоматическое определение кодировки
-- 📦 Готов к упаковке в исполняемый файл (PyInstaller)
+- 🎯 Speech synthesis in multiple languages (Russian, English, etc.)
+- 🚀 **Stream mode** — process multiple tasks without restarting the process
+- 🔐 **base64** text encoding support
+- 📝 Read text from command line arguments or stdin
+- 🔄 Automatic encoding detection
+- 📦 Ready for packaging into executable file (PyInstaller)
 
-## Установка
+## Installation
 
-Убедитесь, что у вас установлены зависимости:
+Make sure you have the dependencies installed:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Модели
+## Models
 
-Поместите языковые модели в папку `models/`:
-- `ru.onnx` и `ru.onnx.json` для русского языка
-- `en.onnx` и `en.onnx.json` для английского языка
-- и т.д.
+Place language models in the `models/` folder:
+- `ru.onnx` and `ru.onnx.json` for Russian
+- `en.onnx` and `en.onnx.json` for English
+- etc.
 
-Модели можно скачать с [официального репозитория Piper](https://github.com/rhasspy/piper/releases).
+Models can be downloaded from the [official Piper repository](https://github.com/rhasspy/piper/releases).
 
-## Использование
+## Usage
 
-### 1. Базовое использование (текст из аргумента):
+### 1. Basic usage (text from argument):
 ```bash
-python main.py "Привет, мир!" -l ru
+python main.py "Hello, world!" -l en
 ```
 
-### 2. Текст с base64 кодированием:
+### 2. Text with base64 encoding:
 ```bash
-python main.py "0J/RgNC40LLQtdGCINC80LjRgCE=" --base64 -l ru
+python main.py "SGVsbG8sIHdvcmxkIQ==" --base64 -l en
 ```
 
-### 3. Чтение текста из stdin (pipe):
+### 3. Reading text from stdin (pipe):
 ```bash
-echo "Это текст из pipe" | python main.py -l ru
+echo "This is text from pipe" | python main.py -l en
 ```
-или (Windows PowerShell):
+or (Windows PowerShell):
 ```powershell
-"Это текст из pipe" | python main.py -l ru
+"This is text from pipe" | python main.py -l en
 ```
-или чтение из файла:
+or reading from file:
 ```bash
-type input.txt | python main.py -l ru
-# или
-python main.py -l ru < input.txt
+type input.txt | python main.py -l en
+# or
+python main.py -l en < input.txt
 ```
 
-### 4. 🚀 Потоковый режим (Stream mode):
+### 4. 🚀 Stream mode:
 
-**Запуск потокового режима:**
+**Starting stream mode:**
 ```bash
-python main.py --stream -l ru -o "D:/output"
+python main.py --stream -l en
 ```
 
-**Формат команд через stdin:**
+**Command format via stdin:**
 ```
-base64_текст|имя_файла
+base64_text|full_path_to_file
 ```
-или просто:
+or simply:
 ```
-base64_текст
+base64_text
 ```
-(файл создастся автоматически с уникальным именем)
+(file will be created automatically with a unique name in the current directory)
 
-**Завершение работы:**
+**Exit:**
 ```
 exit
 ```
 
-**Пример использования из Python:**
+**Python usage example:**
 ```python
 import subprocess
 import base64
 
-# Запускаем процесс в потоковом режиме
+# Start process in stream mode
 process = subprocess.Popen(
-    ['python', 'main.py', '--stream', '-l', 'ru', '-o', 'D:/output'],
+    ['python', 'main.py', '--stream', '-l', 'en'],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     text=True,
     encoding='utf-8'
 )
 
-# Кодируем текст в base64
-text1 = base64.b64encode("Привет мир".encode('utf-8')).decode('ascii')
-text2 = base64.b64encode("Второй текст".encode('utf-8')).decode('ascii')
+# Encode text to base64
+text1 = base64.b64encode("Hello world".encode('utf-8')).decode('ascii')
+text2 = base64.b64encode("Second text".encode('utf-8')).decode('ascii')
 
-# Отправляем команды (модель загружается только один раз!)
-process.stdin.write(f'{text1}|file1.wav\n')
+# Send commands with FULL file paths (model loads only once!)
+process.stdin.write(f'{text1}|D:/output/file1.wav\n')
 process.stdin.flush()
 
-process.stdin.write(f'{text2}|file2.wav\n')
+process.stdin.write(f'{text2}|C:/temp/audio/file2.wav\n')
 process.stdin.flush()
 
-# Читаем результаты
-# QUEUED:file1.wav
-# SUCCESS:D:/output/file1.wav
-# QUEUED:file2.wav
-# SUCCESS:D:/output/file2.wav
+# Or with relative paths
+text3 = base64.b64encode("Third text".encode('utf-8')).decode('ascii')
+process.stdin.write(f'{text3}|subfolder/file3.wav\n')
+process.stdin.flush()
 
-# Завершаем
+# Read results
+# QUEUED:D:/output/file1.wav
+# SUCCESS:D:\output\file1.wav
+# QUEUED:C:/temp/audio/file2.wav
+# SUCCESS:C:\temp\audio\file2.wav
+# QUEUED:subfolder/file3.wav
+# SUCCESS:D:\projects\python\tts\subfolder\file3.wav
+
+# Exit
 process.stdin.write('exit\n')
 process.stdin.close()
 ```
 
-**Преимущества потокового режима:**
-- ✅ Модель загружается **один раз** и остается в памяти
-- ✅ Обработка **очереди задач** в отдельном потоке
-- ✅ Быстрая генерация множества файлов без перезапуска процесса
-- ✅ Идеально для интеграции в игры и приложения
+**Stream mode advantages:**
+- ✅ Model loads **once** and stays in memory
+- ✅ **Task queue** processing in a separate thread
+- ✅ Fast generation of multiple files without process restart
+- ✅ **Complete freedom in choosing directories** — each file can be saved anywhere
+- ✅ Automatic directory creation if they don't exist
+- ✅ Perfect for game and application integration
 
-### 5. Указание выходного файла:
+### 5. Specifying output file:
 ```bash
 python main.py "Hello world" -l en -o my_speech.wav
 ```
 
-### 6. Просмотр доступных моделей:
+### 6. List available models:
 ```bash
 python main.py --list-models
 ```
 
-## Параметры
+## Parameters
 
-- `text` - текст для синтеза речи (опционально, если не указан — берётся из stdin)
-- `-l, --language` - язык модели (по умолчанию: ru)
-- `-o, --output` - имя выходного WAV файла или директория для потокового режима
-- `--list-models` - показать доступные модели
-- `--base64` - входной текст закодирован в base64
-- `--stream` - **потоковый режим**: читать команды из stdin и обрабатывать очередь задач
-- `-e, --encoding` - кодировка stdin (utf-8, cp1251, cp866, utf-16-le, utf-16-be, auto — по умолчанию)
-- `--debug-stdin` - вывод отладочной информации: длина и hex первых байтов stdin
-- `--fail-on-question` - прерывать выполнение, если весь текст деградировал до `?`
+- `text` - text for speech synthesis (optional, if not specified — read from stdin)
+- `-l, --language` - model language (default: ru)
+- `-o, --output` - output WAV file name
+- `--list-models` - show available models
+- `--base64` - input text is base64 encoded
+- `--stream` - **stream mode**: read commands from stdin and process task queue
+- `-e, --encoding` - stdin encoding (utf-8, cp1251, cp866, utf-16-le, utf-16-be, auto — default)
+- `--debug-stdin` - output debug information: length and hex of first stdin bytes
+- `--fail-on-question` - abort execution if all text degraded to `?`
 
-## Примеры
+## Examples
 
-### Обычный режим:
+### Normal mode:
 ```bash
-# Русский текст (аргумент)
-python main.py "Это тест русской речи" -l ru
+# English text (argument)
+python main.py "This is a speech test" -l en
 
-# Английский текст (stdin)
-echo "This is a test of English speech" | python main.py -l en
+# Russian text (stdin)
+echo "Это тест русской речи" | python main.py -l ru
 
-# С указанием выходного файла
-python main.py "Тестовое сообщение" -l ru -o test.wav
+# With output file
+python main.py "Test message" -l en -o test.wav
 
-# Большой текст из файла
-python main.py -l ru < long_text.txt
+# Large text from file
+python main.py -l en < long_text.txt
 
-# Base64 кодирование
-python main.py "0J/RgNC40LLQtdGCINC80LjRgCE=" --base64 -l ru -o hello.wav
+# Base64 encoding
+python main.py "SGVsbG8sIHdvcmxkIQ==" --base64 -l en -o hello.wav
 ```
 
-### Потоковый режим:
+### Stream mode:
 ```bash
-# Запуск с автоматическими именами файлов
-python main.py --stream -l ru
-
-# Запуск с указанием директории для файлов
-python main.py --stream -l ru -o "D:/audio_output"
+# Start with automatic file names
+python main.py --stream -l en
 ```
 
-### Диагностика:
+### Diagnostics:
 ```bash
-# Принудительная кодировка cp1251
+# Force cp1251 encoding
 python main.py -l ru -e cp1251 < text_cp1251.txt
 
-# Диагностика stdin
-echo Привет | python main.py -l ru --debug-stdin
+# Debug stdin
+echo Hello | python main.py -l en --debug-stdin
 
-# Прервать при потере кириллицы
-echo Привет | python main.py -l ru --fail-on-question
+# Abort on text loss
+echo Test | python main.py -l en --fail-on-question
 ```
 
-## Форматы вывода в потоковом режиме
+## Stream mode output formats
 
-При работе в `--stream` режиме программа выводит следующие сообщения:
+In `--stream` mode, the program outputs the following messages:
 
-- `QUEUED:имя_файла` - задача добавлена в очередь
-- `SUCCESS:полный_путь_к_файлу` - файл успешно создан
-- `ERROR:описание_ошибки` - произошла ошибка при обработке
+- `QUEUED:filename` - task added to queue
+- `SUCCESS:full_path_to_file` - file successfully created
+- `ERROR:error_description` - error occurred during processing
 
-## Интеграция в игры
+## Game Integration
 
-Потоковый режим идеально подходит для интеграции TTS в игры:
+Stream mode is perfect for TTS integration in games:
 
-1. **Запустите TTS один раз** при старте игры
-2. **Отправляйте команды** через stdin по мере необходимости
-3. **Получайте результаты** через stdout
-4. **Завершайте процесс** командой `exit` при закрытии игры
+1. **Start TTS once** when the game starts
+2. **Send commands** via stdin as needed
+3. **Receive results** via stdout
+4. **Exit process** with `exit` command when closing the game
 
-Модель остается загруженной в памяти, что обеспечивает быструю генерацию без задержек на инициализацию.
+The model stays loaded in memory, ensuring fast generation without initialization delays.
 
-## Кодировка и Windows
+## Encoding and Windows
 
-Если при передаче текста через pipe появляются `???` или весь текст превращается в `??????`:
+If text passed through pipe shows `???` or all text turns into `??????`:
 
-1. Смените кодовую страницу консоли на UTF-8 (cmd):
+1. Change console code page to UTF-8 (cmd):
 ```cmd
 chcp 65001
 ```
-2. PowerShell 5.x: настройте Unicode ввод/вывод:
+2. PowerShell 5.x: configure Unicode input/output:
 ```powershell
 [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 ```
-3. **Рекомендация:** используйте `--base64` флаг для надежной передачи текста с кириллицей
+3. **Recommendation:** use `--base64` flag for reliable text transfer with Cyrillic characters
 
-## Сборка в исполняемый файл
+## Building executable file
 
-Для создания standalone `.exe` файла используйте PyInstaller:
+To create a standalone `.exe` file, use PyInstaller:
 
 ```bash
 pyinstaller tts.spec
 ```
 
-Исполняемый файл будет создан в папке `dist/`.
+The executable will be created in the `dist/` folder.
 
-## Лицензия
+## License
 
-См. файл [LICENSE](LICENSE).
+See [LICENSE](LICENSE) file.

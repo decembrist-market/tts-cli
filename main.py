@@ -4,7 +4,10 @@ import sys
 import wave
 import os
 import base64
+import json
 from pathlib import Path
+from queue import Queue
+from threading import Thread
 
 def safe_print(*args, **kwargs):
     """Безопасный print для subprocess в Windows"""
@@ -141,6 +144,102 @@ class TTSProcessor:
 
         return models
 
+    def stream_mode(self, default_language="ru", default_output_dir=None):
+        """Потоковый режим: читает команды из stdin и обрабатывает их"""
+        safe_print("=== TTS Потоковый режим запущен ===")
+        safe_print(f"Язык: {default_language}")
+        safe_print("Формат команды: base64_текст|путь_к_файлу")
+        safe_print("Или просто: base64_текст (файл будет создан автоматически)")
+        safe_print("Для завершения введите: exit")
+        safe_print("Ожидаю команды...\n")
+        sys.stdout.flush()
+
+        task_queue = Queue()
+
+        def worker():
+            """Рабочий поток для обработки задач из очереди"""
+            while True:
+                task = task_queue.get()
+                if task is None:  # Сигнал завершения
+                    task_queue.task_done()
+                    break
+
+                try:
+                    base64_text, output_path = task
+
+                    # Декодируем base64
+                    text = decode_base64_text(base64_text)
+
+                    # Используем default_output_dir если указан
+                    if default_output_dir:
+                        output_path = os.path.join(default_output_dir, os.path.basename(output_path))
+
+                    # Генерируем речь с языком из аргументов запуска
+                    result = self.text_to_speech(text, default_language, output_path)
+
+                    # Выводим результат
+                    safe_print(f"SUCCESS:{result}")
+                    sys.stdout.flush()
+
+                except Exception as e:
+                    safe_print(f"ERROR:{str(e)}")
+                    sys.stdout.flush()
+
+                task_queue.task_done()
+
+        # Запускаем рабочий поток
+        worker_thread = Thread(target=worker, daemon=True)
+        worker_thread.start()
+
+        # Читаем команды из stdin
+        try:
+            for line in sys.stdin:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                # Команда завершения
+                if line.lower() == "exit":
+                    safe_print("Получена команда завершения. Завершаю работу...")
+                    sys.stdout.flush()
+                    break
+
+                # Парсим команду: base64_текст|путь или просто base64_текст
+                parts = line.split('|')
+
+                if len(parts) == 1:
+                    # Только base64 текст, генерируем имя автоматически
+                    base64_text = parts[0]
+                    # Генерируем уникальное имя файла
+                    import time
+                    timestamp = int(time.time() * 1000)
+                    output_path = f"output_{timestamp}.wav"
+                elif len(parts) == 2:
+                    # base64 текст и путь к файлу
+                    base64_text, output_path = parts
+                else:
+                    safe_print(f"ERROR:Неверный формат команды. Ожидается: base64_текст|путь или base64_текст")
+                    sys.stdout.flush()
+                    continue
+
+                # Добавляем задачу в очередь
+                task_queue.put((base64_text, output_path))
+                safe_print(f"QUEUED:{output_path}")
+                sys.stdout.flush()
+
+        except KeyboardInterrupt:
+            safe_print("\nПолучен сигнал прерывания. Завершаю работу...")
+            sys.stdout.flush()
+
+        # Ждем завершения всех задач
+        task_queue.put(None)  # Сигнал завершения для worker
+        task_queue.join()
+        worker_thread.join(timeout=5)
+
+        safe_print("=== TTS Потоковый режим завершен ===")
+        sys.stdout.flush()
+
 
 def decode_base64_text(base64_text):
     """Декодирует текст из base64 формата"""
@@ -160,9 +259,10 @@ def main():
     parser = argparse.ArgumentParser(description="TTS с использованием Piper")
     parser.add_argument("text", nargs="?", help="Текст для синтеза речи")
     parser.add_argument("-l", "--language", default="ru", help="Язык модели (по умолчанию: ru)")
-    parser.add_argument("-o", "--output", help="Имя выходного WAV файла")
+    parser.add_argument("-o", "--output", help="Имя выходного WAV файла или директория для потокового режима")
     parser.add_argument("--list-models", action="store_true", help="Показать доступные модели")
     parser.add_argument("--base64", action="store_true", help="Входной текст закодирован в base64")
+    parser.add_argument("--stream", action="store_true", help="Потоковый режим: читать команды из stdin")
 
     args = parser.parse_args()
 
@@ -172,6 +272,14 @@ def main():
     # Показываем доступные модели
     if args.list_models:
         tts.list_available_models()
+        return
+
+    # Потоковый режим
+    if args.stream:
+        tts.stream_mode(
+            default_language=args.language,
+            default_output_dir=args.output
+        )
         return
 
     # Проверяем, что передан текст
